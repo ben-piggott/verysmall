@@ -1,0 +1,5 @@
+# Ignore files part of compilation process
+*.o
+*.elf
+*.list
+*.swp
