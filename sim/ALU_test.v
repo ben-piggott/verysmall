@@ -43,13 +43,13 @@ begin
     A = 1'b0;
     B = 1'b0;
     ALU_reset();
-    ADD_Test  (Test_report[6]);
-    SUB_Test  (Test_report[5]);
+    //ADD_Test  (Test_report[6]);
+    //SUB_Test  (Test_report[5]);
     SLT_Test  (Test_report[4]);
-    SLTU_Test (Test_report[3]);
-    XOR_Test  (Test_report[2]);
-    OR_Test   (Test_report[1]);
-    AND_Test  (Test_report[0]);
+    //SLTU_Test (Test_report[3]);
+    //XOR_Test  (Test_report[2]);
+    //OR_Test   (Test_report[1]);
+    //AND_Test  (Test_report[0]);
     $display("#############################");
     $display("ALU Test Results : %b", Test_report);
     $display("#############################");
@@ -568,6 +568,26 @@ task SLT_Test;
         end
         ALU_reset();
         
+        // -------------------------------------------------------------------
+        // Test 8
+        // -------------------------------------------------------------------
+        // 10 < 10
+        @(posedge clk);
+        RsA = 10;
+        RsB = 10;
+        enter_inputs();
+        // Check outputs
+        if (Dest !== `ZERO) 
+        begin 
+            $display("-----------------------------");
+            $display("Test 8 - Failed");
+            $display("%0D < %0D", $signed(RsA), $signed(RsB));
+            $display("Expected output: %0D", `ZERO);
+            $display("Actual output:   %0D", Dest);
+            pass = 1'b0;
+        end
+        ALU_reset();
+                
         $display("*****************************");
         if (~pass) $display("Test 04 - FAILED");
         else $display("Test 04 - PASSED"); 
