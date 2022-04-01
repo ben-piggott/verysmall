@@ -26,27 +26,34 @@
 `include "RegFile.v"
 `include "Shifter.v"
 
+`define   DEBUG
+
 module System(
     input clk,
     input cu_rst,
     // Debug outputs
-    //output mem_addr_bus_port,
+    `ifdef DEBUG
+    output mem_addr_bus_port,
     output mem_out_bus_port,
     output mem_in_bus_port,
     output bit_position_port
+    `endif
 );
 (* keep = "true" *) wire [31:0] pc;
 (* keep = "true" *) wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
 (* keep = "true" *) wire [9:0]  mem_addr_bus, serial_addr_bus;
 (* keep = "true" *) wire [5:0]  bit_position;
 (* keep = "true" *) wire [3:0]  func, mem_we_mask;
+(* keep = "true" *) wire [1:0]  bru_func;
 (* keep = "true" *) wire [4:0]  regA_select, regB_select;
 (* keep = "true" *) wire        imm;
 
-//assign mem_addr_bus_port = mem_addr_bus;
+`ifdef DEBUG
+assign mem_addr_bus_port = mem_addr_bus;
 assign mem_out_bus_port = mem_out_bus;
 assign mem_in_bus_port = mem_in_bus;
 assign bit_position_port = bit_position;
+`endif
 
 // Initiliase Control Block
 Control_Unit CU(
@@ -62,6 +69,7 @@ Control_Unit CU(
     .bit_position(bit_position),
     .mem_mask(mem_we_mask),
     .op(func),
+    .bru_op(bru_func),
     .regA(regA_select),
     .regB(regB_select),
     .reg_we(reg_we),
@@ -110,7 +118,7 @@ ALU ALU (
 
 // Initiliase BRU
 BRU BRU (
-    .func(func[2:0]),
+    .func(bru_func),
     .ALU_output(alu_out_sum),
     .ALU_slt(alu_out_slt),
     .rst(bru_rst),
@@ -119,7 +127,10 @@ BRU BRU (
 );
 
 // Initiliase register file
-RegFile RegFile (
+RegFile #(
+    .D_WIDTH(32),
+	.D_NO(31)
+) RegFile (
     .data_in(reg_in),
     .regA_select(regA_select),
     .regB_select(regB_select),
@@ -127,8 +138,8 @@ RegFile RegFile (
     .writeEn(reg_we),
     .rst(reg_rst),
     .clk(clk),
-    .portA(reg_outA),
-    .portB(reg_outB)
+    .portA(regA_out),
+    .portB(regB_out)
 );
 
 // Initiliase memory block
@@ -174,8 +185,8 @@ Shifter Shifter(
 // Multiplexers
 
 // ALU
-(* keep = "true" *) assign alu_inA = alu_inA_mux ? reg_outA : serial_out_bit;
-(* keep = "true" *) assign alu_inB = alu_inB_mux ? reg_outB : imm;
+(* keep = "true" *) assign alu_inA = alu_inA_mux ? regA_out : serial_out_bit;
+(* keep = "true" *) assign alu_inB = alu_inB_mux ? regB_out : imm;
 (* keep = "true" *) assign alu_out = alu_out_mux ? alu_out_slt : alu_out_sum;
 (* keep = "true" *) assign alu_reg_out = alu_reg_out_mux ? alu_reg_q31 : alu_reg_q0;
 // Memory
@@ -183,7 +194,7 @@ Shifter Shifter(
 // RegFile
 (* keep = "true" *) assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en ? alu_reg_out : alu_out));
 // Serialiser
-(* keep = "true" *) assign serial_in_bit = serial_in_mux ? alu_out : reg_outB;
+(* keep = "true" *) assign serial_in_bit = serial_in_mux ? alu_out : regB_out;
 (* keep = "true" *) assign serial_in_bus = mem_out_mux ? mem_out_bus : pc;
 
 

@@ -35,6 +35,7 @@ module Control_Unit(
     output     [5:0]    bit_position,
     output reg [3:0]    mem_mask,
     output reg [3:0]    op,
+    output reg [1:0]    bru_op,
     output     [4:0]    regA,
     output     [4:0]    regB,
     output reg          reg_we,
@@ -113,6 +114,9 @@ mux32 imm_mux(
 // Set initial values
 initial
 begin
+    @(posedge clk);
+    state           = START_0;
+    next_state      = START_0;
     pc              = 32'h00000000;
     instruction_reg = 32'h00000000; 
     reg_we          = 1'b0;
@@ -137,13 +141,10 @@ end
 
 
 // Transition state
-initial state = START_0;
-initial next_state = START_0;
 always @(posedge clk)
-    if (rst)
-        state <= START_0;
-    else if (memory_misaligned) state <= SYSTEM_0;
-    else state <= next_state;
+    if (rst) state = START_0;
+    else if (memory_misaligned) state = SYSTEM_0;
+    else state = next_state;
 
 // State machine case statement    
 always @(posedge clk)
@@ -154,12 +155,14 @@ always @(posedge clk)
     START_0:
     begin
         op              = {1'b0, `LW};
+        instruction_reg = 32'h00000000;
         byte_addr       = 2'b00;
+        bru_op          = 2'b00;
         mem_en          = 1'b0;
+        counter_en      = 1'b0;
         // Reset ALU, BRU and counter
         alu_rst         = 1'b1;
         bru_rst         = 1'b1;
-        counter_rst     = 1'b1;
         alu_carry_in    = 1'b0;
         alu_inA_mux     = 1'b1; // Register A
         alu_inB_mux     = 1'b1; // Register B
@@ -179,33 +182,34 @@ always @(posedge clk)
         begin
             alu_rst     = 1'b0;
             bru_rst     = 1'b0;
-            counter_rst = 1'b0;
+            counter_rst = 1'b1; // Reset counter to zero
+            counter_en  = 1'b1; // Enable cycle counter
             next_state  = START_1;
         end
     end
     // ------------------------------------------------------------------------
     // Decode instruction and increment PC
-    // 35 Cycles
+    // 33 Cycles
     START_1:
     begin
-        instruction_reg <= instruction;
-        mem_en          = 1'b0;
-        counter_en      = 1'b1; //Enable cycle counter
-        op              = {1'b0, `ADD}; // Set ALU to ADD
-        pc_addr_en      = 1'b0;
+        mem_en          = 1'b0; //
+        pc_addr_en      = 1'b0; // Address 
+        counter_rst     = 1'b0; // Stop reseting counter
         alu_inA_mux     = 1'b0; // PC register via serialiser
         alu_inB_mux     = 1'b0; // Immediate register
         alu_out_mux     = 1'b0; // ALU sum output
         alu_out_reg     = 1'b0; // ALU output register disabled
         mem_out_mux     = 1'b0; // Bus from CU not memory
-        if (instruction_reg[7:0] == `JALR || instruction_reg[7:0] == `JAL) 
-        begin      
+        op              = {1'b0, `ADD}; // Set ALU to ADD
+        instruction_reg = instruction;
+        if (instruction[6:0] == `JALR || instruction[6:0] == `JAL)
+        begin   
             reg_we      = 1'b1; // Enable register write for link reg
         end
         else
             pc[count]   = alu_result; // Otherwise update PC
         // Set next state based on instruction
-        if (count[5])
+        if (count == 31)
         begin
             alu_inA_mux = 1'b1; // Register file
             alu_inB_mux = 1'b1; // Register file
@@ -213,6 +217,7 @@ always @(posedge clk)
             // Disable counter and reset
             counter_en  = 1'b0;
             counter_rst = 1'b1;
+            alu_rst     = 1'b1;
             OP_DECODE (instruction_reg[6:0]);
         end
     end
@@ -221,22 +226,7 @@ always @(posedge clk)
     // 33 Cycles
     ALU_0:
     begin
-        counter_rst     = 1'b0;
-        counter_en      = 1'b1; //Enable cycle counter
-        // Set ALU to function from instruction
-        // Set bit [3] to 1 if it is SLT or STLU for SUB operation
-        op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : instruction_reg[30]), instruction_reg[14:12]}; 
-        alu_inA_mux     = 1'b1; // Register A
-        alu_inB_mux     = 1'b1; // Register B
-        if (op[3])
-            alu_carry_in = count == 0;
-        else 
-            alu_carry_in = 1'b0;
-        if (op[2:1] == 2'b01 && count == 31)
-            alu_out_mux = 1'b1; // ALU SLT output
-        else
-            alu_out_mux = 1'b0; // ALU sum output
-        if (count[5])
+        if (count == 31)
         begin
             // Disable counter and reset
             counter_en  = 1'b0;
@@ -246,7 +236,25 @@ always @(posedge clk)
             next_state  = WRITEBACK_0;
         end
         else
-            alu_out_reg = 1'b1; // ALU output register enabled
+        begin
+            counter_rst      = 1'b0;
+            counter_en       = 1'b1; //Enable cycle counter
+            alu_rst          = 1'b0;
+            alu_out_reg      = 1'b1; // ALU output register enabled
+            // Set ALU to function from instruction
+            // Set bit [3] to 1 if it is SLT or STLU for SUB operation
+            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : instruction_reg[30]), instruction_reg[14:12]}; 
+            alu_inA_mux      = 1'b1; // Register A
+            alu_inB_mux      = 1'b1; // Register B
+            if (op[3])
+                alu_carry_in = count == 0;
+            else 
+                alu_carry_in = 1'b0;
+            if (op[2:1] == 2'b01 && count == 31)
+                alu_out_mux  = 1'b1; // ALU SLT output
+            else
+                alu_out_mux  = 1'b0; // ALU sum output
+        end
     end
     // ------------------------------------------------------------------------
     // Execute ALU immediate operation and write into output register for
@@ -254,23 +262,7 @@ always @(posedge clk)
     // 33 Cycles
     ALUI_0:
     begin
-        counter_rst     = 1'b0;
-        counter_en      = 1'b1; //Enable cycle counter
-        // Set ALU to function from instruction
-        // Set bit [3] to 1 if it is SLT or STLU for SUB operation
-        op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : 1'b0), instruction_reg[14:12]}; 
-        alu_inA_mux     = 1'b1; // Register A
-        alu_inB_mux     = 1'b0; // Immediate output
-        mem_out_mux     = 1'b0; // Bus from CU not memory
-        if (op[3])
-            alu_carry_in = count == 0;
-        else 
-            alu_carry_in = 1'b0;
-        if (op[2:1] == 2'b01 && count == 31)
-            alu_out_mux = 1'b1; // ALU SLT output for final bit
-        else
-            alu_out_mux = 1'b0; // ALU sum output
-        if (count[5])
+        if (count == 31)
         begin
             // Disable counter and reset
             counter_en  = 1'b0;
@@ -280,22 +272,42 @@ always @(posedge clk)
             next_state  = WRITEBACK_0;
         end
         else
-            alu_out_reg = 1'b1; // ALU output register enabled
+        begin
+            counter_rst      = 1'b0;
+            counter_en       = 1'b1; //Enable cycle counter
+            alu_out_reg      = 1'b1; // ALU output register enabled
+            alu_rst          = 1'b0;
+            // Set ALU to function from instruction
+            // Set bit [3] to 1 if it is SLT or STLU for SUB operation
+            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : 1'b0), instruction_reg[14:12]}; 
+            alu_inA_mux      = 1'b1; // Register A
+            alu_inB_mux      = 1'b0; // Immediate output
+            mem_out_mux      = 1'b0; // Bus from CU not memory
+            if (op[3])
+                alu_carry_in = count == 0;
+            else 
+                alu_carry_in = 1'b0;
+            if (op[2:1] == 2'b01 && count == 31)
+                alu_out_mux  = 1'b1; // ALU SLT output for final bit
+            else
+                alu_out_mux  = 1'b0; // ALU sum output
+        end
     end
     // ------------------------------------------------------------------------
     // Shift bits by number of bits in register
-    // 65 + No. of shifts Cycles
+    // 67 + No. of shifts Cycles (0 for shift left)
     SHIFT_0:
     begin
         // Set ALU to function from instruction
         op              = {instruction_reg[30], instruction_reg[14:12]}; 
         alu_out_reg     = 1'b0; // ALU output register disabled
-        if (count[5] && shift_load)
+        alu_rst         = 1'b0;
+        if (count == 31 && shift_load)
         begin
             shift_load  = 1'b0;
             counter_rst = 1'b1;
         end
-        else if (count[5])
+        else if (count == 31)
             next_state  = START_0;
         else 
         begin
@@ -310,18 +322,19 @@ always @(posedge clk)
     end
     // ------------------------------------------------------------------------
     // Shift bits by number of bits in immediate register
-    // 65 + No. of shifts Cycles
+    // 67 + No. of shifts Cycles (0 for shift left)
     SHIFTI_0:
     begin
         // Set ALU to function from instruction
         op              = {instruction_reg[30], instruction_reg[14:12]};
         alu_out_reg     = 1'b0; // ALU output register disabled
-        if (count[5] && shift_load)
+        alu_rst         = 1'b0;
+        if (count == 31 && shift_load)
         begin
             shift_load  = 1'b0;
             counter_rst = 1'b1;
         end
-        else if (count[5])
+        else if (count == 31)
             next_state  = START_0;
         else 
         begin
@@ -340,7 +353,8 @@ always @(posedge clk)
     // 44 Cycles due to only needing 11 cycles for the address calculation
     LOAD_0:
     begin
-        if (count[5])
+        alu_rst         = 1'b0;
+        if (count == 31)
         begin
             mem_en      = 1'b0; // Disable memory
             reg_we      = 1'b0; // Regfile write disabled
@@ -377,32 +391,30 @@ always @(posedge clk)
     // 44 Cycles due to only needing 11 cycles for the address calculation
     STORE_0:
     begin
-        counter_rst     = 1'b0;
-        if (mem_mask != 4'b0000)
+        alu_rst         = 1'b0;
+        if (mem_mask == 4'b0000 && count == 12)
+        begin
+            counter_rst = 1'b1; // Reset counter
+            op          = {1'b0, instruction_reg[14:12]};
+            // Calculate write enable mask
+            mem_mask    = op[1] ? 4'b1111: (op[0] ? 4'b0011 << byte_addr : 4'b0001 << byte_addr);
+        end
+        else if (count == 31)
+        begin
+            mem_en      = 1'b1; // Enable memory once deserial register is full
+            counter_en  = 1'b0; // Disable counter
+            reg_we      = 1'b0; // Regfile write disabled
+            next_state  = START_0; // Set next state
+        end
+        else if (mem_mask != 4'b0000)
         begin
             serial_in_mux = 1'b0;
-            if (count == 31)
-                mem_en      = 1'b1; // Enable memory once deserial register is full
-            op          = {1'b0, instruction_reg[14:12]};
             counter_rst = 1'b0;
             counter_en  = 1'b1; // Enable counter
             reg_in_mux  = 1'b1; // Reg in from serialiser
             mem_out_mux = 1'b1; // Serialiser in from memory
             serial_out_mode = 1'b0; // Deserialise to memory data in
-        end
-        else if (mem_mask == 4'b0000 && count == 10)
-        begin
-            counter_rst = 1'b1; // Reset counter
-            // Calculate write enable mask
-            mem_mask    = op[1] ? 4'b1111: (op[0] ? 4'b0011 << byte_addr : 4'b0001 << byte_addr);
-        end
-        else if (count[5])
-        begin
-            mem_en      = 1'b0; // Disable memory
-            counter_en  = 1'b0; // Disable counter
-            reg_we      = 1'b0; // Regfile write disabled
-            next_state  = START_0; // Set next state
-        end
+        end 
         else
         begin
             if (count < 2) byte_addr[count] = alu_result;
@@ -422,55 +434,56 @@ always @(posedge clk)
     // 33 cycles for false and 66 cycles for true
     BRANCH_0:
     begin
-        counter_rst         = 1'b0;
-        if (~alu_inA_mux)
-        begin
-            counter_rst     = 1'b0;
-            counter_en      = 1'b1; //Enable cycle counter
-            op              = {1'b0, `ADD}; // Set ALU to ADD
-            alu_out_mux     = 1'b0; // ALU sum output
-            alu_out_reg     = 1'b0; // ALU output register disabled
-
-            mem_out_mux     = 1'b0; // Bus from CU not memory
-            if (count > 0) pc[count - 1] = alu_result;
-        end
-        else if (count[5] && ~alu_inA_mux)
+        if (count == 31 && ~alu_inA_mux)
         begin
             alu_inA_mux     = 1'b1; // Register file
             alu_inB_mux     = 1'b1; // Register file
-            // Update last bit of PC
-            pc[count - 1] = alu_result;
             // Disable counter and reset
             counter_en      = 1'b0;
             counter_rst     = 1'b1;
             next_state      = START_0;
-        end    
-        else if (count[5])
+        end 
+        else if (~alu_inA_mux)
         begin
-            // Disable counter
+            counter_rst     = 1'b0;
+            counter_en      = 1'b1; //Enable cycle counter
+            alu_rst         = 1'b0;
+            op              = {1'b0, `ADD}; // Set ALU to ADD
+            alu_out_mux     = 1'b0; // ALU sum output
+            alu_out_reg     = 1'b0; // ALU output register disabled
+            mem_out_mux     = 1'b0; // Bus from CU not memory
+            pc[count]       = alu_result;
+        end  
+        else if (count == 31)
+        begin
+            // Disable and reset counter
             counter_en      = 1'b0;
+            counter_rst     = 1'b1;
             // If branch is true change input muxes to offset pc
             if (bru_result)
             begin
                 alu_inA_mux = 1'b0; // PC register via serialiser
-                alu_inB_mux = 1'b0; // Immediate register        
+                alu_inB_mux = 1'b0; // Immediate register      
+                immediate_reg = immediate_reg - 4;  
+                alu_rst     = 1'b1;
             end
             // Else go back to start
             else
+            begin
                 next_state  = START_0;
+            end
         end
         else
         begin
             counter_rst     = 1'b0;
             counter_en      = 1'b1; //Enable cycle counter
+            alu_rst         = 1'b0;
             // Set ALU for the comparison
-            op              = instruction_reg[14] ? {1'b0, (instruction_reg[13] ? `SLTU : `SLT)} : {1'b1, `SUB};
+            op              = {1'b1, instruction_reg[14] ? (instruction_reg[13] ? `SLTU : `SLT) : `SUB};
+            bru_op          = {instruction_reg[14], instruction_reg[12]};
             alu_inA_mux     = 1'b1; // Register A
             alu_inB_mux     = 1'b1; // Register B
-            if (op[3])
-                alu_carry_in = count == 0;
-            else 
-                alu_carry_in = 1'b0;
+            alu_carry_in    = count[5];
         end
     end
     // ------------------------------------------------------------------------
@@ -479,8 +492,9 @@ always @(posedge clk)
     JUMP_0:
     begin
         counter_rst     = 1'b0;
-        counter_en = 1'b1; //Enable cycle counter
-        op = {1'b0, `ADD}; // Set ALU to ADD
+        counter_en      = 1'b1; //Enable cycle counter
+        op              = {1'b0, `ADD}; // Set ALU to ADD
+        alu_rst         = 1'b0;
         // PC register via serialiser or register depending on JAL or JALR
         alu_inA_mux     = instruction_reg[7:0] == `JALR;
         alu_inB_mux     = 1'b0; // Immediate register        
@@ -489,7 +503,7 @@ always @(posedge clk)
         mem_out_mux     = 1'b0; // Bus from CU not memory
         pc[count]       = alu_result; // Otherwise update PC
         // Set next state based on instruction
-        if (count[5])
+        if (count == 31)
         begin
             // Disable counter
             counter_en  = 1'b0;
@@ -504,18 +518,21 @@ always @(posedge clk)
     IMM_0:
     begin
         counter_rst     = 1'b0;
-        counter_en = 1'b1; //Enable cycle counter
-        op = {1'b0, `ADD}; // Set ALU to ADD
+        counter_en      = 1'b1; //Enable cycle counter
+        alu_rst         = 1'b0;
+        op              = {1'b0, `ADD}; // Set ALU to ADD
         // Add immediate to PC if AUIPC, add 0 if not (ALU passthrough)
         // Regfile outputs 0 on portA if write is enable
-        alu_inA_mux     = instruction_reg[7:0] == `AUIPC;
+        alu_inA_mux     = instruction_reg[6:0] == `LUI;
         alu_inB_mux     = 1'b0; // Immediate register        
         alu_out_mux     = 1'b0; // ALU sum output
         alu_out_reg     = 1'b0; // ALU output register disabled
+        reg_alu_mux     = 1'b0; // ALU output to register in
+        reg_in_mux      = 1'b0; // Reg in from ALU
         mem_out_mux     = 1'b0; // Bus from CU not memory
         reg_we          = 1'b1;
         // Set next state based on instruction
-        if (count[5])
+        if (count == 31)
         begin
             // Stop writing to regfile
             reg_we      = 1'b0;
@@ -530,35 +547,37 @@ always @(posedge clk)
     // 33 Cycles
     WRITEBACK_0:
     begin
-        counter_rst     = 1'b0;
-        counter_en      = 1'b1; // Enable cycle counter
-        reg_in_mux      = 1'b0; // From ALU/Shifter
-        reg_alu_mux     = 1'b0; // From ALU
-        reg_we          = 1'b1; // Enable regfile write
-        if (op[2:1] == 2'b01 && count == 0)
-            begin
-            // ALU output register disabled to get SLT result bit
-            alu_out_reg     = 1'b1;
-            // Last bit of register for SLT result to go first 
-            alu_reg_out_mux = 1'b1; 
-            end
-        else if (op[2:1] == 2'b01)
-            begin
-            alu_out_reg     = 1'b1; // ALU output register enabled
-            alu_reg_out_mux = 1'b0; // Then pad with 0s
-            end
-        if (count[5])
+        if (count == 31)
         begin
             // Disable counter
-            counter_en  = 1'b0;
-            alu_out_reg = 1'b0; // ALU output register disabled
-            reg_we      = 1'b0; // Regfile write disabled
-            alu_out_reg = 1'b0; // ALU output register disabled
+            counter_rst     = 1'b1;
+            counter_en      = 1'b0;
+            alu_out_reg     = 1'b0; // ALU output register disabled
+            reg_we          = 1'b0; // Regfile write disabled
             // Set next state
-            next_state  = START_0;
+            next_state      = START_0;
         end
         else
-            alu_out_reg = 1'b1; // ALU output register enabled
+        begin
+            counter_rst     = 1'b0;
+            counter_en      = 1'b1; // Enable cycle counter
+            reg_we          = 1'b1; // Regfile write enabled
+            reg_in_mux      = 1'b0; // From ALU/Shifter
+            reg_alu_mux     = 1'b0; // From ALU
+            alu_out_reg     = 1'b1; // ALU output register enabled
+            if (op[2:1] == 2'b01 && count == 0)
+            begin
+                // ALU output register disabled to get SLT result bit
+                alu_out_reg     = 1'b0;
+                // Last bit of register for SLT result to go first 
+                alu_reg_out_mux = 1'b0; 
+            end
+            else
+            begin
+                alu_out_reg     = 1'b1; // ALU output register enabled
+                alu_reg_out_mux = 1'b1; // Then pad with 0s
+            end
+        end
     end
     default: $stop;
     endcase

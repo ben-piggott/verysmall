@@ -36,7 +36,6 @@ module Data_Serialiser(
 wire [31:0] data_mux_in;
 wire        data_mux_out;
 reg  [11:0] Address;
-reg  [5:0]  startPos;
 reg         extend_bit;
 
 assign address_out_bus = Address[11:2];

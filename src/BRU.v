@@ -23,7 +23,7 @@
 // Use ALU SUB function for BEQ and BNE (SUB results in NOT 0)
 
 module BRU(
-    input [2:0] func, // Made of bits 2 and 0 of func3 of Branch instruction
+    input [1:0] func, // Made of bits 2 to 0 of func3 of Branch instruction
     input       ALU_slt,
     input       ALU_output,
     input       rst,
@@ -38,7 +38,7 @@ reg neq;
 // BNE just output not equal register
 // BLT[U] just pass through the ALU slt/sltu output
 // BGE[U] pass inverse of ALU slt/sltu output
-assign branch = func[2] ? (func[0] ? ~ALU_slt : ALU_slt) : (func[0] ? neq : ~neq);
+assign branch = func[1] ? (func[0] ? ~ALU_slt : ALU_slt) : (func[0] ? neq : ~neq);
 
 // At each clock edge take OR of not equal register and ALU sum output (output
 // will be from a subtraction operation)

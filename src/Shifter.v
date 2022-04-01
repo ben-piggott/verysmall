@@ -40,9 +40,9 @@ wire [4:0]  count;
 reg  [4:0]  counter_val;
 
 // Enable signals
-assign shift_enable = ~bitPos[5] && (load || (func[2] ? 1'b1 : count == 0));
-assign count_enable = ~load && count > 0 && ~bitPos[5];
-assign out_en       = ~load && ~bitPos[5] && (func[2] ? count == 0 : 1'b1);
+assign shift_enable = ~(bitPos >= 31) && (load || (func[2] ? 1'b1 : count == 0));
+assign count_enable = ~load && count > 0 && ~(bitPos >= 31);
+assign out_en       = ~load && ~(bitPos >= 31) && (func[2] ? count == 0 : 1'b1);
 
 // Load in bits into shifter
 assign shift_in = load ? opA : func[3] ? sign_bit : 1'b0;
@@ -50,7 +50,7 @@ assign shift_in = load ? opA : func[3] ? sign_bit : 1'b0;
 // Load for 31 bits after a reset
 always @(posedge clk)
     if (rst) load = 1'b1;
-    else if(bitPos[5]) load = 1'b0;
+    else if(bitPos == 31) load = 1'b0;
 
 // Load how much to shift by into counter
 always @(posedge clk)
@@ -58,7 +58,7 @@ always @(posedge clk)
 assign counter_load = load && bitPos == 5;
 
 // Choose output source
-assign out = out_en ? (~func[2] && count > 0 ? 1'b0 : shift_out ) : 1'bZ;
+assign out = out_en ? (~func[2] && count > 0 ? 1'b0 : shift_out ) : 1'b0;
 
 // Initialise shift register
 SRLC32E #(
