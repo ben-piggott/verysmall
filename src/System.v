@@ -39,14 +39,14 @@ module System(
     output bit_position_port
     `endif
 );
-(* keep = "true" *) wire [31:0] pc;
-(* keep = "true" *) wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
-(* keep = "true" *) wire [9:0]  mem_addr_bus, serial_addr_bus;
-(* keep = "true" *) wire [5:0]  bit_position;
-(* keep = "true" *) wire [3:0]  func, mem_we_mask;
-(* keep = "true" *) wire [1:0]  bru_func;
-(* keep = "true" *) wire [4:0]  regA_select, regB_select;
-(* keep = "true" *) wire        imm;
+wire [31:0] pc;
+wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
+wire [9:0]  mem_addr_bus, serial_addr_bus;
+wire [5:0]  bit_position;
+wire [3:0]  func, mem_we_mask;
+wire [1:0]  bru_func;
+wire [4:0]  regA_select, regB_select;
+wire        imm;
 
 `ifdef DEBUG
 assign mem_addr_bus_port = mem_addr_bus;
@@ -101,7 +101,7 @@ SRLC32E #(
     .A(5'b00000), // 5-bit shift depth select input
     .CE(alu_out_reg_en), // Clock enable input
     .CLK(clk), // Clock input
-    .D(alu_reg_in) // SRL data input
+    .D(alu_out) // SRL data input
 );
 
 // Initialise ALU    
@@ -185,17 +185,17 @@ Shifter Shifter(
 // Multiplexers
 
 // ALU
-(* keep = "true" *) assign alu_inA = alu_inA_mux ? regA_out : serial_out_bit;
-(* keep = "true" *) assign alu_inB = alu_inB_mux ? regB_out : imm;
-(* keep = "true" *) assign alu_out = alu_out_mux ? alu_out_slt : alu_out_sum;
-(* keep = "true" *) assign alu_reg_out = alu_reg_out_mux ? alu_reg_q31 : alu_reg_q0;
+assign alu_inA = alu_inA_mux ? regA_out : serial_out_bit;
+assign alu_inB = alu_inB_mux ? regB_out : imm;
+assign alu_out = alu_out_mux ? alu_out_slt : alu_out_sum;
+assign alu_reg_out = alu_reg_out_mux ? alu_reg_q31 : alu_reg_q0;
 // Memory
-(* keep = "true" *) assign mem_addr_bus = pc_addr_en ? pc[11:2] : serial_addr_bus; 
+assign mem_addr_bus = pc_addr_en ? pc[11:2] : serial_addr_bus; 
 // RegFile
-(* keep = "true" *) assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en ? alu_reg_out : alu_out));
+assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en ? alu_reg_out : alu_out));
 // Serialiser
-(* keep = "true" *) assign serial_in_bit = serial_in_mux ? alu_out : regB_out;
-(* keep = "true" *) assign serial_in_bus = mem_out_mux ? mem_out_bus : pc;
+assign serial_in_bit = serial_in_mux ? alu_out : regB_out;
+assign serial_in_bus = mem_out_mux ? mem_out_bus : pc;
 
 
 endmodule
