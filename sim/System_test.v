@@ -18,8 +18,9 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-module System_test(
+module System_test (
 );
+parameter TEST_FILE = "test.mem";
 wire [31:0] pc;
 wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
 wire [9:0]  mem_addr_bus, serial_addr_bus;
@@ -31,7 +32,7 @@ wire        imm;
 
 reg  clk = 1'b0;
 always #(2) clk = ~clk;
-initial #12000 $stop;
+initial #250000 $stop;
 
 
 // Initiliase Control Block
@@ -126,7 +127,7 @@ RegFile #(
 BlockRAMwithMask #(
 	.D_WIDTH(32),
 	.D_DEPTH_WIDTH(10),
-	.INIT_FILE("./test.mem")
+	.INIT_FILE(TEST_FILE)
 ) Memory (
 	.clk(clk),
 	.dataIn(mem_in_bus),
