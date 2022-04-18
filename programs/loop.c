@@ -1,4 +1,4 @@
-int test( void ) {
+int main( void ) {
 	int count = 10;
 	while (count > 0)
 	{
