@@ -38,6 +38,8 @@ wire        data_mux_out;
 reg  [11:0] Address;
 reg         extend_bit;
 
+initial Address = 12'h000;
+
 assign address_out_bus = Address[11:2];
 
 // Extend for byte and halfwords
