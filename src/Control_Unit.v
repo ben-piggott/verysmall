@@ -508,7 +508,7 @@ always @(posedge clk)
             // Disable counter
             counter_en  = 1'b0;
             // Check PC is not misaligned
-            if (pc[1] || pc[2]) next_state = SYSTEM_0;
+            if (pc[0] || pc[1]) next_state = SYSTEM_0;
             else next_state  = START_0;
         end
     end
