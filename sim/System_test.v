@@ -18,9 +18,9 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-module System_test (
+module System_test(
 );
-parameter TEST_FILE = "test.mem";
+parameter   TEST_FILE = "test.mem";
 wire [31:0] pc;
 wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
 wire [9:0]  mem_addr_bus, serial_addr_bus;
