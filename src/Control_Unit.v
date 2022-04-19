@@ -44,6 +44,7 @@ module Control_Unit(
     output reg          bru_rst,
     output reg          reg_rst,
     output reg          mem_rst,
+    output reg          serial_rst,
     output reg          pc_addr_en,
     output reg          alu_inA_mux,
     output reg          alu_inB_mux,
@@ -125,6 +126,7 @@ begin
     bru_rst         = 1'b0;
     reg_rst         = 1'b0;
     mem_rst         = 1'b0;
+    serial_rst      = 1'b0;
     pc_addr_en      = 1'b0;
     alu_inA_mux     = 1'b0;
     alu_inB_mux     = 1'b0;
@@ -154,37 +156,44 @@ always @(posedge clk)
     // 2 Cycles
     START_0:
     begin
-        op              = {1'b0, `LW};
-        instruction_reg = 32'h00000000;
-        byte_addr       = 2'b00;
-        bru_op          = 2'b00;
-        mem_en          = 1'b0;
-        counter_en      = 1'b0;
-        // Reset ALU, BRU and counter
-        alu_rst         = 1'b1;
-        bru_rst         = 1'b1;
-        alu_carry_in    = 1'b0;
-        alu_inA_mux     = 1'b1; // Register A
-        alu_inB_mux     = 1'b1; // Register B
-        immediate_reg   = 32'h00000004; // Set immediate to 4
-        // Set write mask to 0 to read from memory
-        mem_mask        = 4'b0000;
-        // Enable memory to load instruction
-        if (pc_addr_en) mem_en = 1'b1;
-        // Set memory address to read from PC
-        pc_addr_en      = 1'b1;
-        // Make sure nothing is written to registers
-        reg_we          = 1'b0;
-        serial_out_mode = 1'b0; // Deserialise to memory data in
+        if (pc_addr_en == 1'b0) mem_en = 1'b0;
         // If memory enable is high the instruction should have been read
         // Therefore transition to decode state
         if (mem_en == 1'b1)
         begin
-            alu_rst     = 1'b0;
-            bru_rst     = 1'b0;
-            counter_rst = 1'b1; // Reset counter to zero
-            counter_en  = 1'b1; // Enable cycle counter
-            next_state  = START_1;
+            alu_rst         = 1'b0;
+            bru_rst         = 1'b0;
+            serial_rst      = 1'b0;
+            counter_rst     = 1'b1; // Reset counter to zero
+            counter_en      = 1'b1; // Enable cycle counter
+            mem_en          = 1'b0;
+            next_state      = START_1;
+        end
+        else
+        begin
+            op              = {1'b0, `LW};
+            instruction_reg = 32'h00000000;
+            byte_addr       = 2'b00;
+            bru_op          = 2'b00;
+            mem_en          = 1'b0;
+            counter_en      = 1'b0;
+            // Reset ALU, BRU, serialiser and counter
+            alu_rst         = 1'b1;
+            bru_rst         = 1'b1;
+            serial_rst      = 1'b1;
+            alu_carry_in    = 1'b0;
+            alu_inA_mux     = 1'b1; // Register A
+            alu_inB_mux     = 1'b1; // Register B
+            immediate_reg   = 32'h00000004; // Set immediate to 4
+            // Set write mask to 0 to read from memory
+            mem_mask        = 4'b0000;
+            // Enable memory to load instruction
+            mem_en = 1'b1;
+            // Set memory address to read from PC
+            pc_addr_en      = 1'b1;
+            // Make sure nothing is written to registers
+            reg_we          = 1'b0;
+            serial_out_mode = 1'b0; // Deserialise to memory data in
         end
     end
     // ------------------------------------------------------------------------
@@ -192,7 +201,6 @@ always @(posedge clk)
     // 33 Cycles
     START_1:
     begin
-        mem_en          = 1'b0; //
         pc_addr_en      = 1'b0; // Address 
         counter_rst     = 1'b0; // Stop reseting counter
         alu_inA_mux     = 1'b0; // PC register via serialiser
@@ -202,10 +210,8 @@ always @(posedge clk)
         mem_out_mux     = 1'b0; // Bus from CU not memory
         op              = {1'b0, `ADD}; // Set ALU to ADD
         instruction_reg = instruction;
-        if (instruction[6:0] == `JALR || instruction[6:0] == `JAL)
-        begin   
+        if (instruction[6:0] == `JALR || instruction[6:0] == `JAL) 
             reg_we      = 1'b1; // Enable register write for link reg
-        end
         else
             pc[count]   = alu_result; // Otherwise update PC
         // Set next state based on instruction
@@ -362,6 +368,7 @@ always @(posedge clk)
         end
         else if (mem_en)
         begin
+            op          = {1'b0, instruction_reg[14:12]};
             reg_we      = 1'b1; // Enable reg write
             counter_rst = 1'b0;
             counter_en  = 1'b1; // Enable counter
@@ -495,6 +502,7 @@ always @(posedge clk)
         counter_en      = 1'b1; //Enable cycle counter
         op              = {1'b0, `ADD}; // Set ALU to ADD
         alu_rst         = 1'b0;
+        reg_we          = 1'b0;
         // PC register via serialiser or register depending on JAL or JALR
         alu_inA_mux     = instruction_reg[7:0] == `JALR;
         alu_inB_mux     = 1'b0; // Immediate register        

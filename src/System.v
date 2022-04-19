@@ -166,7 +166,9 @@ Data_Serialiser Serialiser (
     .bitPos(bit_position),
     .mode(serial_out_mode),
     .clk(clk),
+    .rst(serialiser_rst),
     .func(func[2:0]),
+    .data_in_switch(mem_out_mux),
     .mem_misaligned(memory_misaligned)
 );
 

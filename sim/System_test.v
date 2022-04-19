@@ -20,7 +20,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 module System_test(
 );
-parameter   TEST_FILE = "test.mem";
 wire [31:0] pc;
 wire [31:0] mem_in_bus, mem_out_bus, serial_in_bus;
 wire [9:0]  mem_addr_bus, serial_addr_bus;
@@ -32,8 +31,7 @@ wire        imm;
 
 reg  clk = 1'b0;
 always #(2) clk = ~clk;
-initial #250000 $stop;
-
+initial #1000000 $stop;
 
 // Initiliase Control Block
 Control_Unit CU(
@@ -58,6 +56,7 @@ Control_Unit CU(
     .bru_rst(bru_rst),
     .reg_rst(reg_rst),
     .mem_rst(mem_rst),
+    .serial_rst(serialiser_rst),
     .pc_addr_en(pc_addr_en),
     .alu_inA_mux(alu_inA_mux),
     .alu_inB_mux(alu_inB_mux),
@@ -127,7 +126,7 @@ RegFile #(
 BlockRAMwithMask #(
 	.D_WIDTH(32),
 	.D_DEPTH_WIDTH(10),
-	.INIT_FILE(TEST_FILE)
+	.INIT_FILE("./crc.mem")
 ) Memory (
 	.clk(clk),
 	.dataIn(mem_in_bus),
@@ -147,7 +146,9 @@ Data_Serialiser Serialiser (
     .bitPos(bit_position),
     .mode(serial_out_mode),
     .clk(clk),
-    .func(func[2:0]),
+    .rst(serialiser_rst),
+    .func(func),
+    .data_in_switch(mem_out_mux),
     .mem_misaligned(memory_misaligned)
 );
 

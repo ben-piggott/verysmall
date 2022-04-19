@@ -22,7 +22,7 @@ reg  [11:0] Register_address;
 reg  [9:0]  Memory_address;
 integer     Count, i;
 reg  [2:0]  Op;
-reg         Data_in_bit, Mode, Memory_error;
+reg         Data_in_bit, Mode, Memory_error, Mem_out;
 
 assign                bitPos                    = Count[4:0];          
 assign                data_in_bus               = Memory_out;
@@ -59,6 +59,7 @@ begin
     Data_in_bit      = 1'b0;
     Mode             = 1'b0;
     Memory_error     = 1'b0;
+    Mem_out          = 1'b0;
     LB_Test (Test_report[7]);
     LH_Test (Test_report[6]);
     LW_Test (Test_report[5]);
@@ -123,6 +124,7 @@ task LB_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `LB;
+        Mem_out = 1'b1;
         for (i = 0; i < 8; i = i + 1)
         begin
             if (i < 4) Memory_out = 32'h000000FF << i*8;
@@ -168,6 +170,7 @@ task LH_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `LH;
+        Mem_out = 1'b1;
         for (i = 0; i < 8; i = i + 2)
         begin
             if (i < 4) Memory_out = 32'h0000FFFF << i*8;
@@ -213,6 +216,7 @@ task LW_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `LW;
+        Mem_out = 1'b1;
         for (i = 0; i < 8; i = i + 4)
         begin
             if (i < 4) Memory_out = 32'hF000000F;
@@ -262,6 +266,7 @@ task LBU_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `LBU;
+        Mem_out = 1'b1;
         for (i = 0; i < 8; i = i + 1)
         begin
             if (i < 4) Memory_out = 32'h000000FF << i*8;
@@ -307,6 +312,7 @@ task LHU_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `LHU;
+        Mem_out = 1'b1;
         for (i = 0; i < 8; i = i + 2)
         begin
             if (i < 4) Memory_out = 32'h0000FFFF << i*8;
@@ -356,6 +362,7 @@ task SB_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `SB;
+        Mem_out = 1'b0;
         for (i = 0; i < 8; i = i + 1)
         begin
             if (i < 4) Register_out = 32'h000000FF;
@@ -401,6 +408,7 @@ task SH_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `SH;
+        Mem_out = 1'b0;
         for (i = 0; i < 8; i = i + 2)
         begin
             if (i < 4) Register_out = 32'h0000FFFF;
@@ -446,6 +454,7 @@ task SW_Test;
         pass = 1'b1;
         @(posedge clk);
         Op = `SW;
+        Mem_out = 1'b0;
         for (i = 0; i < 8; i = i + 4)
         begin
             if (i < 4) Register_out = 32'hF000000F;

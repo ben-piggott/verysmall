@@ -29,6 +29,8 @@ module Data_Serialiser(
     input             data_in_bit,
     input             mode,
     input             clk,
+    input             rst,
+    input             data_in_switch,
     output            data_out_bit,
     output            mem_misaligned
     );
@@ -38,14 +40,12 @@ wire        data_mux_out;
 reg  [11:0] Address;
 reg         extend_bit;
 
-initial Address = 12'h000;
-
 assign address_out_bus = Address[11:2];
 
 // Extend for byte and halfwords
 always @(posedge clk)
     if (func[2]) extend_bit = 1'b0;
-    else extend_bit = func[2] ? data_mux_in[15] : data_mux_in[7];
+    else extend_bit = func[0] ? data_mux_in[15] : data_mux_in[7];
 
 // Send signal if memory address is misaligned
 // If the byte address is not 0 for full word
@@ -60,10 +60,9 @@ assign data_mux_in[7:0]   = Address[1] ?
 assign data_mux_in[15:8]  = func[0] &&  Address[1] ? data_in_bus[31:24] : data_in_bus[15:8];
 assign data_mux_in[31:16] = data_in_bus[31:16];
 // Out bit
-assign data_out_bit       = func[1] ?
-                            data_mux_out:
-                            (func[0] ?  (bitPos[4] ? extend_bit : data_mux_out):
-                            bitPos[3] || bitPos[4] ? extend_bit : data_mux_out);
+assign data_out_bit       = ~data_in_switch || func[1] ? data_mux_out: (func[0] ?
+                            (bitPos[4] ? extend_bit : data_mux_out) :
+                            (bitPos[3] || bitPos[4] ? extend_bit : data_mux_out));
 
 mux32 mux (
     .in(data_mux_in),
@@ -72,7 +71,8 @@ mux32 mux (
 );
 
 always @(posedge clk)
-    if (mode) Address[bitPos] <= data_in_bit;
+    if (rst) Address <= 12'h000;
+    else if (mode) Address[bitPos] <= data_in_bit;
     else data_out_bus[{(bitPos[4:3] ^ Address[1:0]), bitPos[2:0]}] <= data_in_bit;
     
 endmodule
