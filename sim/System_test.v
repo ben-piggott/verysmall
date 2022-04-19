@@ -85,6 +85,7 @@ SRLC32E #(
 
 // Initialise ALU    
 ALU ALU (
+    .bitPos(bit_position),
     .func(func),
     .opA(alu_inA),
     .opB(alu_inB),
@@ -147,7 +148,7 @@ Data_Serialiser Serialiser (
     .mode(serial_out_mode),
     .clk(clk),
     .rst(serialiser_rst),
-    .func(func),
+    .func(func[2:0]),
     .data_in_switch(mem_out_mux),
     .mem_misaligned(memory_misaligned)
 );
@@ -174,7 +175,7 @@ assign alu_reg_out = alu_reg_out_mux ? alu_reg_q31 : alu_reg_q0;
 // Memory
 assign mem_addr_bus = pc_addr_en ? pc[11:2] : serial_addr_bus; 
 // RegFile
-assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en ? alu_reg_out : alu_out));
+assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en || ~alu_reg_out_mux ? alu_reg_out : alu_out));
 // Serialiser
 assign serial_in_bit = serial_in_mux ? alu_out : regB_out;
 assign serial_in_bus = mem_out_mux ? mem_out_bus : pc;

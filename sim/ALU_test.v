@@ -10,12 +10,16 @@ module ALU_test(
 reg       clk               = 1'b0;  
 always #(`CLOCK_PERIOD/2) clk = ~clk;
 
+reg [31:0]  RsA, RsB, Dest;
+integer     i;
+
 wire        sum, slt;
 reg         A, B;
 reg         ALU_rst, Carry;
 reg [3:0]   Op;
 
 ALU ALU (
+    .bitPos(i),
     .func(Op),
     .opA(A),
     .opB(B),
@@ -26,9 +30,6 @@ ALU ALU (
     .slt(slt)
 );
 
-reg [31:0]  RsA, RsB, Dest;
-integer     i;
-
 initial
 begin
     // Initialise ALU
@@ -37,7 +38,7 @@ begin
     A = 1'b0;
     B = 1'b0;
     ALU_reset();
-    BASIC_Test(Test_report[7]);
+    //BASIC_Test(Test_report[7]);
     Op = 4'b0000;
     Carry = 1'b0;
     A = 1'b0;
@@ -45,8 +46,8 @@ begin
     ALU_reset();
     //ADD_Test  (Test_report[6]);
     //SUB_Test  (Test_report[5]);
-    SLT_Test  (Test_report[4]);
-    //SLTU_Test (Test_report[3]);
+    //SLT_Test  (Test_report[4]);
+    SLTU_Test (Test_report[3]);
     //XOR_Test  (Test_report[2]);
     //OR_Test   (Test_report[1]);
     //AND_Test  (Test_report[0]);
@@ -65,10 +66,10 @@ task enter_inputs;
         A       = RsA[i];
         B       = RsB[i];
         @(posedge clk);
-        Dest[i] = sum;
+        if(Op == `SLT || Op == `SLTU) Dest[31 - i] = slt;
+        else Dest[i] = sum;
         Carry = 1'b0;
     end
-    if(Op == `SLT || Op == `SLTU) @(posedge clk) Dest[0] = slt;
     end
 endtask
 
@@ -598,10 +599,11 @@ endtask
 // Testing SLTU function
 // Tests:
 // 1. 0 < 0
-// 2. 0 < 4,294,967,295 (FFFF FFFF)
-// 3. 2,147,483,647 (7FFF FFFF) < 4,294,967,295 (FFFF FFFF)
-// 4. 4,294,967,295 (FFFF FFFF) < 1
-// 5. 4,294,967,295 (FFFF FFFF) < 0
+// 2. 0 < 1
+// 3. 0 < 4,294,967,295 (FFFF FFFF)
+// 4. 2,147,483,647 (7FFF FFFF) < 4,294,967,295 (FFFF FFFF)
+// 5. 4,294,967,295 (FFFF FFFF) < 1
+// 6. 4,294,967,295 (FFFF FFFF) < 0
 task SLTU_Test;
     output pass;
     begin
@@ -635,9 +637,9 @@ task SLTU_Test;
         // -------------------------------------------------------------------
         // Test 2
         // -------------------------------------------------------------------
-        // 0 < 2,147,483,647
+        // 0 < 1
         @(posedge clk);
-        RsB = `NEG_ONE;
+        RsB = `ONE;
         enter_inputs();
         // Check outputs
         if (Dest !== `ONE) 
@@ -654,9 +656,9 @@ task SLTU_Test;
         // -------------------------------------------------------------------
         // Test 3
         // -------------------------------------------------------------------
-        // 2,147,483,647 < 4,294,967,295
+        // 0 < 2,147,483,647
         @(posedge clk);
-        RsA = `HIGHEST;
+        RsB = `NEG_ONE;
         enter_inputs();
         // Check outputs
         if (Dest !== `ONE) 
@@ -669,9 +671,28 @@ task SLTU_Test;
             pass = 1'b0;
         end
         ALU_reset();
-        
+
         // -------------------------------------------------------------------
         // Test 4
+        // -------------------------------------------------------------------
+        // 2,147,483,647 < 4,294,967,295
+        @(posedge clk);
+        RsA = `HIGHEST;
+        enter_inputs();
+        // Check outputs
+        if (Dest !== `ONE) 
+        begin 
+            $display("-----------------------------");
+            $display("Test 4 - Failed");
+            $display("%0D < %0D", RsA, RsB);
+            $display("Expected output: %0D", `ONE);
+            $display("Actual output:   %0D", Dest);
+            pass = 1'b0;
+        end
+        ALU_reset();
+        
+        // -------------------------------------------------------------------
+        // Test 5
         // -------------------------------------------------------------------
         // 4,294,967,295 < 1
         @(posedge clk);
@@ -682,7 +703,7 @@ task SLTU_Test;
         if (Dest !== `ZERO) 
         begin 
             $display("-----------------------------");
-            $display("Test 4 - Failed");
+            $display("Test 5 - Failed");
             $display("%0D < %0D", RsA, RsB);
             $display("Expected output: %0D", `ZERO);
             $display("Actual output:   %0D", Dest);
@@ -691,7 +712,7 @@ task SLTU_Test;
         ALU_reset();
         
         // -------------------------------------------------------------------
-        // Test 5
+        // Test 6
         // -------------------------------------------------------------------
         // 0 < 1
         RsB = `ZERO;
@@ -700,7 +721,7 @@ task SLTU_Test;
         if (Dest !== `ZERO) 
         begin 
             $display("-----------------------------");
-            $display("Test 5 - Failed");
+            $display("Test 6 - Failed");
             $display("%0D < %0D", RsA, RsB);
             $display("Expected output: %0D", `ZERO);
             $display("Actual output:   %0D", Dest);

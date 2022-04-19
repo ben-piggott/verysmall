@@ -20,6 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module ALU(
+    input [5:0] bitPos,
     input [3:0] func,
     input       opA,
     input       opB,
@@ -67,9 +68,9 @@ begin
 end
 
 // SLT output multiplexer
-assign slt = (func[0] ? slt_reg_unsigned : slt_reg_signed);
+assign slt = bitPos >= 31 ? (func[0] ? slt_reg_unsigned : slt_reg_signed) : 1'b0;
 
 // ALU output multiplexer
-assign result = func[1] ? (func[2] ?  adder_carry_out : 1'b0) : adder_sum;
+assign result = func[1] ?  adder_carry_out : adder_sum;
 
 endmodule

@@ -249,15 +249,12 @@ always @(posedge clk)
             alu_out_reg      = 1'b1; // ALU output register enabled
             // Set ALU to function from instruction
             // Set bit [3] to 1 if it is SLT or STLU for SUB operation
-            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : instruction_reg[30]), instruction_reg[14:12]}; 
+            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : instruction_reg[30]), instruction_reg[14:12]};
             alu_inA_mux      = 1'b1; // Register A
             alu_inB_mux      = 1'b1; // Register B
-            if (op[3])
-                alu_carry_in = count == 0;
-            else 
-                alu_carry_in = 1'b0;
-            if (op[2:1] == 2'b01 && count == 31)
-                alu_out_mux  = 1'b1; // ALU SLT output
+            alu_carry_in     = op[3] && count[5];
+            if (op[2:1] == 2'b01)
+                alu_out_mux  = 1'b1; // ALU slt output
             else
                 alu_out_mux  = 1'b0; // ALU sum output
         end
@@ -285,16 +282,13 @@ always @(posedge clk)
             alu_rst          = 1'b0;
             // Set ALU to function from instruction
             // Set bit [3] to 1 if it is SLT or STLU for SUB operation
-            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : 1'b0), instruction_reg[14:12]}; 
+            op = {(instruction_reg[14:13] == 2'b01 ? 1'b1 : 1'b0), instruction_reg[14:12]};
             alu_inA_mux      = 1'b1; // Register A
             alu_inB_mux      = 1'b0; // Immediate output
             mem_out_mux      = 1'b0; // Bus from CU not memory
-            if (op[3])
-                alu_carry_in = count == 0;
-            else 
-                alu_carry_in = 1'b0;
-            if (op[2:1] == 2'b01 && count == 31)
-                alu_out_mux  = 1'b1; // ALU SLT output for final bit
+            alu_carry_in     = op[3] && count[5];
+            if (op[2:1] == 2'b01)
+                alu_out_mux  = 1'b1; // ALU slt output
             else
                 alu_out_mux  = 1'b0; // ALU sum output
         end
@@ -572,8 +566,7 @@ always @(posedge clk)
             reg_we          = 1'b1; // Regfile write enabled
             reg_in_mux      = 1'b0; // From ALU/Shifter
             reg_alu_mux     = 1'b0; // From ALU
-            alu_out_reg     = 1'b1; // ALU output register enabled
-            if (op[2:1] == 2'b01 && count == 0)
+            if (op[2:1] == 2'b01 && count[5])
             begin
                 // ALU output register disabled to get SLT result bit
                 alu_out_reg     = 1'b0;
@@ -583,7 +576,7 @@ always @(posedge clk)
             else
             begin
                 alu_out_reg     = 1'b1; // ALU output register enabled
-                alu_reg_out_mux = 1'b1; // Then pad with 0s
+                alu_reg_out_mux = 1'b1;
             end
         end
     end
@@ -618,7 +611,7 @@ task OP_DECODE;
     `OP_IMM:
         begin
         // I Type
-        immediate_reg= {{22{instruction_reg[31]}}, instruction_reg[30:20]};
+        immediate_reg = {{22{instruction_reg[31]}}, instruction_reg[30:20]};
         next_state  = instruction_reg[13:12] == 2'b01 ? SHIFTI_0 : ALUI_0;
         shift_load  = instruction_reg[13:12] == 2'b01; // State bit for inputing or outputing of shifter
         end

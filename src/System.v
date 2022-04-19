@@ -78,11 +78,12 @@ Control_Unit CU(
     .bru_rst(bru_rst),
     .reg_rst(reg_rst),
     .mem_rst(mem_rst),
+    .serial_rst(serialiser_rst),
     .pc_addr_en(pc_addr_en),
     .alu_inA_mux(alu_inA_mux),
     .alu_inB_mux(alu_inB_mux),
-    .alu_carry_in(alu_carry),
     .alu_out_mux(alu_out_mux),
+    .alu_carry_in(alu_carry),
     .alu_out_reg(alu_out_reg_en),
     .alu_reg_out_mux(alu_reg_out_mux),
     .mem_out_mux(mem_out_mux),
@@ -106,6 +107,7 @@ SRLC32E #(
 
 // Initialise ALU    
 ALU ALU (
+    .bitPos(bit_position),
     .func(func),
     .opA(alu_inA),
     .opB(alu_inB),
@@ -194,7 +196,7 @@ assign alu_reg_out = alu_reg_out_mux ? alu_reg_q31 : alu_reg_q0;
 // Memory
 assign mem_addr_bus = pc_addr_en ? pc[11:2] : serial_addr_bus; 
 // RegFile
-assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en ? alu_reg_out : alu_out));
+assign reg_in = reg_in_mux ? serial_out_bit : (reg_alu_mux ? shifter_out : (alu_out_reg_en || ~alu_reg_out_mux ? alu_reg_out : alu_out));
 // Serialiser
 assign serial_in_bit = serial_in_mux ? alu_out : regB_out;
 assign serial_in_bus = mem_out_mux ? mem_out_bus : pc;
