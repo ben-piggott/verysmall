@@ -80,13 +80,9 @@ unsigned long int CRC32(const unsigned char data[], unsigned short int data_leng
 }
 
 int main( void ) {
-		const unsigned char input[16] =
-		{ 0xb9, 0x5a, 0x4a, 0x7e,
-		  0x69, 0xa0, 0x72, 0x1c, 
-		  0xbb, 0x10, 0xe4, 0x04, 
-		  0xc9, 0x6f, 0x71, 0x87 
-		};
-		const unsigned long int answer = 0xC3C0FB39;
+		const unsigned char input[4] =
+		{ 0xb9, 0x5a, 0x4a, 0x7e };
+		const unsigned long int answer = 0x9D3E8EDE;
 		
-		return !(CRC32(input, 16) == answer);
+		return !(CRC32(input, 4) == answer);
 }
