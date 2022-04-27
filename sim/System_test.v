@@ -33,6 +33,16 @@ reg  clk = 1'b0;
 always #(2) clk = ~clk;
 initial #1000000 $stop;
 
+integer cycle_count = 0;
+integer instruction_count = 0;
+
+// Count cycles and instructions for performance
+always @(posedge clk) cycle_count = cycle_count + 1;
+always @(posedge pc_addr_en) instruction_count = instruction_count + 1;
+
+// If PC loops back to 0 after start then stop to prevent infinite looping
+always @(posedge pc_addr_en) if (pc == 0 && instruction_count > 1) $stop;
+
 // Initiliase Control Block
 Control_Unit CU(
     .instruction(mem_out_bus),
